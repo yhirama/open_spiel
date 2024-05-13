@@ -114,9 +114,12 @@ EXPECTED_GAMES = frozenset([
     "python_mfg_dynamic_routing",
     "python_mfg_periodic_aversion",
     "python_mfg_predator_prey",
+    "kuhn_poker_1",
     "python_kuhn_poker",
+    "python_kuhn_poker_1",
     "python_tic_tac_toe",
     "python_liars_poker",
+    "HeadsUpGame"
     "quoridor",
     "repeated_game",
     "rbc",

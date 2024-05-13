@@ -26,14 +26,10 @@ FLAGS = flags.FLAGS
 
 # Game strings can just contain the name or the name followed by parameters
 # and arguments, e.g. "breakthrough(rows=6,columns=6)"
-flags.DEFINE_string("game_string", "tic_tac_toe", "Game string")
+flags.DEFINE_string("game_string", "HeadsUpGame", "Game string")
 
 
 def main(_):
-  games_list = pyspiel.registered_games()
-  print("Registered games:")
-  print(games_list)
-
   action_string = None
 
   print("Creating game: " + FLAGS.game_string)
