@@ -127,6 +127,7 @@ class HeadsUpGameObserver:
     def __init__(self, iig_obs_type, params):
         if params:
             raise ValueError(f"Observation parameters not supported; passed {params}")
+        """
         pieces = [("player", 2, (2,))]
         if iig_obs_type.private_info == pyspiel.PrivateInfoType.SINGLE_PLAYER:
             pieces.append(("private_cards",34 , (2,17)))
@@ -134,6 +135,22 @@ class HeadsUpGameObserver:
         total_size = sum(size for name, size, shape in pieces)
         self.tensor = np.zeros(total_size, np.float32)
 
+        """
+        pieces = [("opp_action_vec", 2, (2,))]
+        pieces.append(("pot", 1, (1,)))
+        pieces.append(("my_pos", 1, (1,)))
+        pieces.append(("my_bankroll", 1, (1,)))
+        pieces.append(("opp_bankroll", 1, (1,)))
+        pieces.append(("my_bet", 1, (1,)))
+        pieces.append(("opp_bet", 1, (1,)))
+        pieces.append(("opp_raise_size", 1, (1,)))
+        pieces.append(("state", 4 (4,)))
+        pieces.append(("my_hand", 5, (5, )))
+        pieces.append(("public_cards", 17, (17, )))
+        pieces.append(("relation_vec", 8, (8,)))
+
+        total_size = sum(size for name, size, shape in pieces)
+        self.tensor = np.zeros(total_size, np.float32)
         self.dict = {}
         index = 0
         for name, size, shape in pieces:
@@ -142,9 +159,22 @@ class HeadsUpGameObserver:
 
     def set_from(self, state, player):
         self.tensor.fill(0)
+        state.game.get_observation()
+        _tmp = state.game.observation["vector"]
+        self.dict["opp_action_vec"][:] = _tmp[0:2]
+        self.dict["pot"][:] = _tmp[2]
+        self.dict["my_pos"][:] = _tmp[3]
+        self.dict["my_bankroll"][:] = _tmp[4]
+        self.dict["opp_bankroll"][:] = _tmp[5]
+        self.dict["my_bet"][:] = _tmp[6]
+        self.dict["opp_bet"][:] = _tmp[7]
+        self.dict["opp_raise_size"][:] = _tmp[8]
+        self.dict["state"][:] = _tmp[9:13]
+
+
+        """
         if "player" in self.dict:
             self.dict["player"][player] = 1
-        """
         if "private_cards" in self.dict:
             self.dict["private_cards"][:] = state.game.get_observation_dict("private_cards")
         if "public_cards" in self.dict:
