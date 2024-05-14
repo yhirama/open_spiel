@@ -31,6 +31,7 @@ from scipy import stats
 import torch
 from torch import nn
 import torch.nn.functional as F
+import inspect
 
 from open_spiel.python import policy
 import pyspiel
@@ -409,6 +410,16 @@ class DeepCFRSolver(policy.Policy):
     advantages = [max(0., advantage) for advantage in raw_advantages]
     cumulative_regret = np.sum([advantages[action] for action in legal_actions])
     matched_regrets = np.array([0.] * self._num_actions)
+
+    if len(legal_actions) == 0:
+      print("No legal actions")
+      print(state.is_terminal())
+      print(player)
+      print(state)
+    if len(raw_advantages) == 0:
+      print("No raw advantages")
+      print(state)
+
     if cumulative_regret > 0.:
       for action in legal_actions:
         matched_regrets[action] = advantages[action] / cumulative_regret

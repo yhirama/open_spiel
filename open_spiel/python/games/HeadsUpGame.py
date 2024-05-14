@@ -6,6 +6,7 @@ import env_headsup
 from Curriculum import Curriculum
 import enum
 import numpy as np
+import inspect
 
 _NUM_PLAYERS = 2
 _DECK = frozenset([0, 1, 2])
@@ -52,7 +53,8 @@ class HaeadsUpGame(pyspiel.Game):
             is_train=is_train,
             self_model_path=self_model_path,
             seed=seed,
-            curriculum=curriculum
+            curriculum=curriculum,
+            one_hand=True
             )
         self.gym_env = gym_env
 
@@ -71,9 +73,11 @@ class HeadsUpGameState(pyspiel.State):
         super().__init__(game)
         self.game = game.gym_env
         self.game.reset()
+
         self._game_over = False
         self.reward = 0
         self.action_space_num = game.gym_env.action_space_num
+        # self.action_space_num = 10
         self.info = None
     
     def current_player(self):
@@ -84,31 +88,53 @@ class HeadsUpGameState(pyspiel.State):
                 return 1
             else:
                 return 0
+
     def _legal_actions(self, player):
         assert player >=0
         self.game.get_observation()
         mask = self.game.observation["mask"]
-        # maskのFalseは0, Trueは1に変換
-        return [i for i in range(len(mask)) if mask[i]]
+        # 全てFalseの場合はprintして終了
+        assert any(mask), "mask is all False"
+        legal_list = [i for i in range(self.action_space_num) if mask[i]]
+        if len(legal_list) < 2:
+            print("mask", mask)
+            print("observation", self.game.observation)
+            print("game_status", self.game.game_status)
+            print("player", player)
+            print("current_player", self.current_player())
+            print("info", self.info)
+            print("reward", self.reward)
+            print("game_over", self._game_over)
+            print("legal_list", legal_list)
+
+        return legal_list
     
     def chance_outcomes(self):
         assert self.is_chance_node()
         return [(i, 1/self.action_space_num) for i in range(self.action_space_num)]
     
     def _apply_action(self, action):
+        """
+        print("------------------")
+        print(self.current_player(), action)
+        print(self.game.game_status.game_state)
+        print(self._legal_actions(self.current_player()))
+        """
         if self.is_chance_node():
             pass
         else:
+            if self._game_over:
+                assert False, "game is over"
             observation, all_reward, done, _, info = self.game.one_step(action)
             self.info = info
             self.reward = all_reward
-            if done:
-                self._game_over = True
+            self._game_over = done
 
     def _action_to_string(self, player, action):
         return str(action)
     
     def is_terminal(self):
+        # print("is_terminal", self._game_over)
         return self._game_over
 
     def returns(self):
@@ -136,7 +162,7 @@ class HeadsUpGameObserver:
         self.tensor = np.zeros(total_size, np.float32)
 
         """
-        pieces = [("opp_action_vec", 2, (2,))]
+        pieces = [("opp_action_vec", 16, (16,))]
         pieces.append(("pot", 1, (1,)))
         pieces.append(("my_pos", 1, (1,)))
         pieces.append(("my_bankroll", 1, (1,)))
@@ -144,7 +170,7 @@ class HeadsUpGameObserver:
         pieces.append(("my_bet", 1, (1,)))
         pieces.append(("opp_bet", 1, (1,)))
         pieces.append(("opp_raise_size", 1, (1,)))
-        pieces.append(("state", 4 (4,)))
+        pieces.append(("state", 4, (4,)))
         pieces.append(("my_hand", 5, (5, )))
         pieces.append(("public_cards", 17, (17, )))
         pieces.append(("relation_vec", 8, (8,)))
@@ -161,16 +187,18 @@ class HeadsUpGameObserver:
         self.tensor.fill(0)
         state.game.get_observation()
         _tmp = state.game.observation["vector"]
-        self.dict["opp_action_vec"][:] = _tmp[0:2]
-        self.dict["pot"][:] = _tmp[2]
-        self.dict["my_pos"][:] = _tmp[3]
-        self.dict["my_bankroll"][:] = _tmp[4]
-        self.dict["opp_bankroll"][:] = _tmp[5]
-        self.dict["my_bet"][:] = _tmp[6]
-        self.dict["opp_bet"][:] = _tmp[7]
-        self.dict["opp_raise_size"][:] = _tmp[8]
-        self.dict["state"][:] = _tmp[9:13]
-
+        self.dict["opp_action_vec"][:] = _tmp[0:16]
+        self.dict["pot"][:] = _tmp[16]
+        self.dict["my_pos"][:] = _tmp[17]
+        self.dict["my_bankroll"][:] = _tmp[18]
+        self.dict["opp_bankroll"][:] = _tmp[19]
+        self.dict["my_bet"][:] = _tmp[20]
+        self.dict["opp_bet"][:] = _tmp[21]
+        self.dict["opp_raise_size"][:] = _tmp[22]
+        self.dict["state"][:] = _tmp[23:27]
+        self.dict["my_hand"][:] = _tmp[27:32]
+        self.dict["public_cards"][:] = _tmp[32:49]
+        self.dict["relation_vec"][:] = _tmp[49:57]
 
         """
         if "player" in self.dict:
