@@ -223,5 +223,4 @@ class KuhnPokerObserver:
 
 
 # Register the game with the OpenSpiel library
-
 pyspiel.register_game(_GAME_TYPE, KuhnPokerGame)

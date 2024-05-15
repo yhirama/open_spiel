@@ -38,6 +38,7 @@ import numpy as np
 
 from open_spiel.python.algorithms import get_all_states
 import pyspiel
+from tqdm import tqdm
 
 
 def child(state, action):
@@ -241,7 +242,7 @@ class TabularPolicy(Policy):
     # they are explicitly specified.
     states = states or get_all_states.get_all_states(
         game,
-        depth_limit=-1,
+        depth_limit=20,
         include_terminals=False,
         include_chance_states=False,
         include_mean_field_states=False,
@@ -465,7 +466,7 @@ def get_tabular_policy_states(game):
     to_string = lambda s: s.history_str()
   return get_all_states.get_all_states(
       game,
-      depth_limit=-1,
+      depth_limit=20,
       include_terminals=False,
       include_chance_states=False,
       include_mean_field_states=False,
@@ -488,8 +489,11 @@ def tabular_policy_from_callable(game, callable_policy, players=None):
   Returns:
     A TabularPolicy that materializes the callable policy.
   """
+  print("Creating TabularPolicy")
   tabular_policy = TabularPolicy(game, players)
-  for state_index, state in enumerate(tabular_policy.states):
+  # for state_index, state in enumerate(tqdm(tabular_policy.states):
+  print("Calculating average policy")
+  for state_index, state in enumerate(tqdm(tabular_policy.states, desc="Calculating average policy")):
     action_probabilities = dict(callable_policy(state))
     infostate_policy = [
         action_probabilities.get(action, 0.)

@@ -77,7 +77,6 @@ class HeadsUpGameState(pyspiel.State):
         self._game_over = False
         self.reward = 0
         self.action_space_num = game.gym_env.action_space_num
-        # self.action_space_num = 10
         self.info = None
     
     def current_player(self):
@@ -91,7 +90,26 @@ class HeadsUpGameState(pyspiel.State):
 
     def _legal_actions(self, player):
         assert player >=0
-        self.game.get_observation()
+        # self.game.get_observation()
+        mask = self.game.observation["mask"]
+        # 全てFalseの場合はprintして終了
+        assert any(mask), "mask is all False"
+        legal_list = [i for i in range(self.action_space_num) if mask[i]]
+        if len(legal_list) < 2:
+            print("mask", mask)
+            print("observation", self.game.observation)
+            print("game_status", self.game.game_status)
+            print("player", player)
+            print("current_player", self.current_player())
+            print("info", self.info)
+            print("reward", self.reward)
+            print("game_over", self._game_over)
+            print("legal_list", legal_list)
+
+        return legal_list
+
+    def legal_actions(self, player=0):
+        # self.game.get_observation()
         mask = self.game.observation["mask"]
         # 全てFalseの場合はprintして終了
         assert any(mask), "mask is all False"
@@ -209,8 +227,9 @@ class HeadsUpGameObserver:
             self.dict["public_cards"][:] = state.game.get_observation_dict("public_cards")
         """
 
-    def string_from(self, player):
+    def string_from(self, state, player):
         return "string from is not implemented"
+
 
 
 pyspiel.register_game(_GAME_TYPE, HaeadsUpGame)

@@ -50,6 +50,7 @@ def policy_value(state,
   Returns:
     A `numpy.array` containing the expected value for each player.
   """
+  print("state", state)
   if state.is_terminal():
     return np.array(state.returns())
   else:
