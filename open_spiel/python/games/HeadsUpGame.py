@@ -26,13 +26,21 @@ _GAME_TYPE = pyspiel.GameType(
     provides_observation_tensor=True,
     provides_factored_observation_string=True)
 _GAME_INFO = pyspiel.GameInfo(
-    num_distinct_actions=203,
+    num_distinct_actions=12,
     max_chance_outcomes=len(_DECK),
     num_players=_NUM_PLAYERS,
     min_utility=-2.0,
     max_utility=2.0,
     utility_sum=0.0,
     max_game_length=3)  # e.g. Pass, Bet, Bet
+
+convert_num_to_action = {
+    0: "fold",
+    1: "call",
+    2: "check",
+    3: "raise"
+}
+
 
 
 class HaeadsUpGame(pyspiel.Game):
@@ -84,9 +92,9 @@ class HeadsUpGameState(pyspiel.State):
             return pyspiel.PlayerId.TERMINAL
         else:
             if self.game.game_status.current_player == "A":
-                return 1
-            else:
                 return 0
+            else:
+                return 1
 
     def _legal_actions(self, player):
         assert player >=0
@@ -129,44 +137,54 @@ class HeadsUpGameState(pyspiel.State):
     
     def chance_outcomes(self):
         assert self.is_chance_node()
+
         return [(i, 1/self.action_space_num) for i in range(self.action_space_num)]
     
     def _apply_action(self, action):
-        """
-        print("------------------")
-        print(self.current_player(), action)
-        print(self.game.game_status.game_state)
-        print(self._legal_actions(self.current_player()))
-        """
         if self.is_chance_node():
             pass
         else:
             if self._game_over:
                 assert False, "game is over"
+            print("apply_action")
+            print("current_player", self.game.game_status.current_player)
             observation, all_reward, done, _, info = self.game.one_step(action)
             self.info = info
             self.reward = all_reward
             self._game_over = done
 
     def _action_to_string(self, player, action):
-        return str(action)
+        if action < 3:
+            return convert_num_to_action[action]
+        else:
+            return f"raise_{action-3}"
     
     def is_terminal(self):
         # print("is_terminal", self._game_over)
         return self._game_over
 
     def returns(self):
-        pot = self.game.game_status.pot
+        _pot = self.game.game_status.pot + self.game.game_status.bet_A + self.game.game_status.bet_B
         if not self._game_over:
             return [0, 0]
         elif self.game.game_status.winner == "A":
-            return [self.reward, -self.reward]
+            return [1, -1]
         else:
-            return [-self.reward, self.reward]
+            return [-1, 1]
         
     def __str__(self):
-        return str(self.game.get_observation_dict("status"))
-    
+        _str = f"game_state: {self.game.game_status.game_state} current_player: {self.game.game_status.current_player}\n"
+        _str += f"position_A: {self.game.game_status.position_A} position_B: {self.game.game_status.position_B}\n"
+        _str += f"pot: {self.game.game_status.pot} Bankroll_A: {self.game.game_status.Bankroll_A} Bankroll_B: {self.game.game_status.Bankroll_B}\n"
+        _str += f"bet_A: {self.game.game_status.bet_A} bet_B: {self.game.game_status.bet_B}\n"
+        _str += f"hands_A: {self.game.game_status.hands_A} hands_B: {self.game.game_status.hands_B}\n"
+        _str += f"board_cards: {self.game.game_status.board_cards}\n"
+        _str += f"done: {self._game_over}\n"
+        _str += f"winnner: {self.game.game_status.winner}\n"
+        _str += f"env_id: {self.game.env_id}\n"
+
+        return _str
+   
 class HeadsUpGameObserver:
     def __init__(self, iig_obs_type, params):
         if params:
@@ -203,7 +221,7 @@ class HeadsUpGameObserver:
 
     def set_from(self, state, player):
         self.tensor.fill(0)
-        state.game.get_observation()
+        # state.game.get_observation()
         _tmp = state.game.observation["vector"]
         self.dict["opp_action_vec"][:] = _tmp[0:16]
         self.dict["pot"][:] = _tmp[16]
@@ -228,7 +246,7 @@ class HeadsUpGameObserver:
         """
 
     def string_from(self, state, player):
-        return "string from is not implemented"
+        return "string from is not implemented."
 
 
 

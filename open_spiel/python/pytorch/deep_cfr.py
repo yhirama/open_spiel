@@ -438,7 +438,9 @@ class DeepCFRSolver(policy.Policy):
     """
     cur_player = state.current_player()
     legal_actions = state.legal_actions(cur_player)
+    print("--")
     info_state_vector = np.array(state.information_state_tensor())
+    print(info_state_vector.shape)
     if len(info_state_vector.shape) == 1:
       info_state_vector = np.expand_dims(info_state_vector, axis=0)
     with torch.no_grad():
