@@ -146,8 +146,6 @@ class HeadsUpGameState(pyspiel.State):
         else:
             if self._game_over:
                 assert False, "game is over"
-            print("apply_action")
-            print("current_player", self.game.game_status.current_player)
             observation, all_reward, done, _, info = self.game.one_step(action)
             self.info = info
             self.reward = all_reward
@@ -171,6 +169,10 @@ class HeadsUpGameState(pyspiel.State):
             return [1, -1]
         else:
             return [-1, 1]
+    
+    def information_state_tensor(self, player=None):
+        _tmp = self.game.observation["vector"]
+        return torch.tensor(_tmp, dtype=torch.float32)
         
     def __str__(self):
         _str = f"game_state: {self.game.game_status.game_state} current_player: {self.game.game_status.current_player}\n"
@@ -181,7 +183,7 @@ class HeadsUpGameState(pyspiel.State):
         _str += f"board_cards: {self.game.game_status.board_cards}\n"
         _str += f"done: {self._game_over}\n"
         _str += f"winnner: {self.game.game_status.winner}\n"
-        _str += f"env_id: {self.game.env_id}\n"
+        _str += f"env_id: {self.game.env_id}"
 
         return _str
    
@@ -222,6 +224,7 @@ class HeadsUpGameObserver:
     def set_from(self, state, player):
         self.tensor.fill(0)
         # state.game.get_observation()
+        print("set_from")
         _tmp = state.game.observation["vector"]
         self.dict["opp_action_vec"][:] = _tmp[0:16]
         self.dict["pot"][:] = _tmp[16]
