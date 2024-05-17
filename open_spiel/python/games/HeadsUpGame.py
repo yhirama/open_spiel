@@ -9,7 +9,6 @@ import numpy as np
 import inspect
 
 _NUM_PLAYERS = 2
-_DECK = frozenset([0, 1, 2])
 _GAME_TYPE = pyspiel.GameType(
     short_name="HeadsUpGame",
     long_name="Python HeadsUpGame",
@@ -27,12 +26,12 @@ _GAME_TYPE = pyspiel.GameType(
     provides_factored_observation_string=True)
 _GAME_INFO = pyspiel.GameInfo(
     num_distinct_actions=12,
-    max_chance_outcomes=len(_DECK),
+    max_chance_outcomes=52,
     num_players=_NUM_PLAYERS,
-    min_utility=-2.0,
-    max_utility=2.0,
+    min_utility=-1.0,
+    max_utility=1.0,
     utility_sum=0.0,
-    max_game_length=3)  # e.g. Pass, Bet, Bet
+    max_game_length=20)  # e.g. Pass, Bet, Bet
 
 convert_num_to_action = {
     0: "fold",
@@ -40,7 +39,6 @@ convert_num_to_action = {
     2: "check",
     3: "raise"
 }
-
 
 
 class HaeadsUpGame(pyspiel.Game):
@@ -86,7 +84,8 @@ class HeadsUpGameState(pyspiel.State):
         self.reward = 0
         self.action_space_num = game.gym_env.action_space_num
         self.info = None
-    
+        self.get_pot = 0
+
     def current_player(self):
         if self._game_over:
             return pyspiel.PlayerId.TERMINAL
@@ -98,7 +97,7 @@ class HeadsUpGameState(pyspiel.State):
 
     def _legal_actions(self, player):
         assert player >=0
-        # self.game.get_observation()
+        self.game.get_observation()
         mask = self.game.observation["mask"]
         # 全てFalseの場合はprintして終了
         assert any(mask), "mask is all False"
@@ -117,7 +116,7 @@ class HeadsUpGameState(pyspiel.State):
         return legal_list
 
     def legal_actions(self, player=0):
-        # self.game.get_observation()
+        self.game.get_observation()
         mask = self.game.observation["mask"]
         # 全てFalseの場合はprintして終了
         assert any(mask), "mask is all False"
@@ -132,7 +131,12 @@ class HeadsUpGameState(pyspiel.State):
             print("reward", self.reward)
             print("game_over", self._game_over)
             print("legal_list", legal_list)
-
+        """
+        print("----")
+        print(self)
+        print("legal_list", legal_list)
+        print("----")
+        """
         return legal_list
     
     def chance_outcomes(self):
@@ -150,25 +154,35 @@ class HeadsUpGameState(pyspiel.State):
             self.info = info
             self.reward = all_reward
             self._game_over = done
+            if self._game_over:
+                self.get_pot = info["get_pot"]
 
     def _action_to_string(self, player, action):
         if action < 3:
             return convert_num_to_action[action]
         else:
-            return f"raise_{action-3}"
+            return f"raise_{action-2}"
     
     def is_terminal(self):
         # print("is_terminal", self._game_over)
         return self._game_over
 
     def returns(self):
-        _pot = self.game.game_status.pot + self.game.game_status.bet_A + self.game.game_status.bet_B
+        # reward = self.get_pot / 4000.0
+        self.game.get_observation()
+        reward_a = (self.game.game_status.Bankroll_A - self.game.game_status.Start_Bankroll_A) / 2000.0
+        reward_b = (self.game.game_status.Bankroll_B - self.game.game_status.Start_Bankroll_B) / 2000.0 
+
         if not self._game_over:
             return [0, 0]
-        elif self.game.game_status.winner == "A":
-            return [1, -1]
         else:
-            return [-1, 1]
+            return [reward_a, reward_b]
+        """
+        elif self.game.game_status.winner == "A":
+            return [reward, -reward]
+        else:
+            return [-reward, reward]
+        """
     
     def information_state_tensor(self, player=None):
         _tmp = self.game.observation["vector"]

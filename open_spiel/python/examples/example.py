@@ -68,6 +68,7 @@ def main(_):
       state.apply_actions(chosen_actions)
     else:
       # Decision node: sample action for the single current player
+      print("legal_actions", state.legal_actions())
       action = random.choice(state.legal_actions(state.current_player()))
       action_string = state.action_to_string(state.current_player(), action)
       print("Player ", state.current_player(), ", randomly sampled action: ",

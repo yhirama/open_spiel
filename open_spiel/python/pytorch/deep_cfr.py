@@ -443,6 +443,10 @@ class DeepCFRSolver(policy.Policy):
       info_state_vector = np.expand_dims(info_state_vector, axis=0)
     with torch.no_grad():
       logits = self._policy_network(torch.FloatTensor(info_state_vector))
+      # legal_actionsの数値を0にする
+      for a in range(self._num_actions):
+        if a not in legal_actions:
+          logits[0][a] = -1e9
       probs = self._policy_sm(logits).numpy()
     return {action: probs[0][action] for action in legal_actions}
 
