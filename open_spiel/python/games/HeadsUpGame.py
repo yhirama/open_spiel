@@ -197,6 +197,8 @@ class HeadsUpGameState(pyspiel.State):
         _str += f"board_cards: {self.game.game_status.board_cards}\n"
         _str += f"done: {self._game_over}\n"
         _str += f"winnner: {self.game.game_status.winner}\n"
+        if self.game.game_status.winner is not None:
+            _str += f"get_pot: {self.get_pot}\n"
         _str += f"env_id: {self.game.env_id}"
 
         return _str

@@ -19,16 +19,24 @@ on the mean field distribution.
 """
 
 import itertools
+from tqdm import tqdm
 
 from open_spiel.python import games  # pylint:disable=unused-import
 import pyspiel
 
+depth_distribution = {}
 
 def _get_subgames_states(state, all_states, depth_limit, depth,
                          include_terminals, include_chance_states,
                          include_mean_field_states, to_string,
-                         stop_if_encountered):
+                         stop_if_encountered, pbar=None):
   """Extract non-chance states for a subgame into the all_states dict."""
+  depth_distribution[depth] = depth_distribution.get(depth, 0) + 1
+  if pbar is not None:
+    pbar.update(1)
+    pbar.set_description(f"States: {len(all_states)} Depth distribution: {depth_distribution}")
+
+
   if state.is_terminal():
     if include_terminals:
       # Include if not already present and then terminate recursion.
@@ -36,7 +44,6 @@ def _get_subgames_states(state, all_states, depth_limit, depth,
       if state_str not in all_states:
         all_states[state_str] = state.clone()
     return
-
   if depth > depth_limit >= 0:
     return
   is_mean_field = state.current_player() == pyspiel.PlayerId.MEAN_FIELD
@@ -63,7 +70,7 @@ def _get_subgames_states(state, all_states, depth_limit, depth,
     _get_subgames_states(state_for_search, all_states, depth_limit, depth + 1,
                          include_terminals, include_chance_states,
                          include_mean_field_states, to_string,
-                         stop_if_encountered)
+                         stop_if_encountered, pbar)
   elif state.is_simultaneous_node():
     joint_legal_actions = [
         state.legal_actions(player)
@@ -75,14 +82,14 @@ def _get_subgames_states(state, all_states, depth_limit, depth,
       _get_subgames_states(state_for_search, all_states, depth_limit, depth + 1,
                            include_terminals, include_chance_states,
                            include_mean_field_states, to_string,
-                           stop_if_encountered)
+                           stop_if_encountered, pbar)
   else:
     for action in state.legal_actions():
       state_for_search = state.child(action)
       _get_subgames_states(state_for_search, all_states, depth_limit, depth + 1,
                            include_terminals, include_chance_states,
                            include_mean_field_states, to_string,
-                           stop_if_encountered)
+                           stop_if_encountered, pbar)
 
 
 def get_all_states(game,
@@ -120,9 +127,9 @@ def get_all_states(game,
     A `dict` with `to_string(state)` keys and `pyspiel.State` values containing
     all states encountered traversing the game tree up to the specified depth.
   """
+  pbar = tqdm()
   root_states = game.new_initial_states()
   all_states = dict()
-
   for root in root_states:
     # Then, do a recursive tree walk to fill up the map.
     _get_subgames_states(
@@ -134,8 +141,10 @@ def get_all_states(game,
         include_chance_states=include_chance_states,
         include_mean_field_states=include_mean_field_states,
         to_string=to_string,
-        stop_if_encountered=stop_if_encountered)
-
+        stop_if_encountered=stop_if_encountered,
+        pbar=pbar
+        )
+  pbar.close()
   if not all_states:
     raise ValueError("GetSubgameStates returned 0 states!")
 
