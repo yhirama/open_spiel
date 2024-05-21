@@ -7,6 +7,7 @@ from Curriculum import Curriculum
 import enum
 import numpy as np
 import inspect
+import copy
 
 _NUM_PLAYERS = 2
 _GAME_TYPE = pyspiel.GameType(
@@ -85,6 +86,16 @@ class HeadsUpGameState(pyspiel.State):
         self.action_space_num = game.gym_env.action_space_num
         self.info = None
         self.get_pot = 0
+        self.history = []
+
+    def clone(self):
+        new_state = copy.deepcopy(self)
+        return new_state
+
+    def child(self, action):
+        new_state = self.clone()
+        new_state._apply_action(action)
+        return new_state
 
     def current_player(self):
         if self._game_over:
@@ -94,6 +105,8 @@ class HeadsUpGameState(pyspiel.State):
                 return 0
             else:
                 return 1
+    def history_str(self):
+        return " ".join([str(i) for i in self.history])
 
     def _legal_actions(self, player):
         assert player >=0
@@ -150,6 +163,7 @@ class HeadsUpGameState(pyspiel.State):
         else:
             if self._game_over:
                 assert False, "game is over"
+            self.history.append(action)
             observation, all_reward, done, _, info = self.game.one_step(action)
             self.info = info
             self.reward = all_reward
@@ -195,6 +209,8 @@ class HeadsUpGameState(pyspiel.State):
         _str += f"bet_A: {self.game.game_status.bet_A} bet_B: {self.game.game_status.bet_B}\n"
         _str += f"hands_A: {self.game.game_status.hands_A} hands_B: {self.game.game_status.hands_B}\n"
         _str += f"board_cards: {self.game.game_status.board_cards}\n"
+        _str += f"action A: {self.game.action_A} B: {self.game.action_B}\n"
+        _str += f"action_history A: {self.game.game_status.action_history_A} B: {self.game.game_status.action_history_B}\n"
         _str += f"done: {self._game_over}\n"
         _str += f"winnner: {self.game.game_status.winner}\n"
         if self.game.game_status.winner is not None:

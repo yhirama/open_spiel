@@ -35,7 +35,7 @@ def _get_subgames_states(state, all_states, depth_limit, depth,
   if pbar is not None:
     pbar.update(1)
     pbar.set_description(f"States: {len(all_states)} Depth distribution: {depth_distribution}")
-
+    print(state)
 
   if state.is_terminal():
     if include_terminals:
@@ -46,6 +46,7 @@ def _get_subgames_states(state, all_states, depth_limit, depth,
     return
   if depth > depth_limit >= 0:
     return
+
   is_mean_field = state.current_player() == pyspiel.PlayerId.MEAN_FIELD
   if (state.is_chance_node() and
       include_chance_states) or (is_mean_field and

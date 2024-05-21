@@ -40,6 +40,7 @@ from open_spiel.python.algorithms import get_all_states
 import pyspiel
 from tqdm import tqdm
 
+DEPTH_LIMIT = 5
 
 def child(state, action):
   """Returns a child state, handling the simultaneous node case."""
@@ -242,7 +243,7 @@ class TabularPolicy(Policy):
     # they are explicitly specified.
     states = states or get_all_states.get_all_states(
         game,
-        depth_limit=20,
+        depth_limit=DEPTH_LIMIT,
         include_terminals=False,
         include_chance_states=False,
         include_mean_field_states=False,
@@ -466,7 +467,7 @@ def get_tabular_policy_states(game):
     to_string = lambda s: s.history_str()
   return get_all_states.get_all_states(
       game,
-      depth_limit=20,
+      depth_limit=DEPTH_LIMIT,
       include_terminals=False,
       include_chance_states=False,
       include_mean_field_states=False,
