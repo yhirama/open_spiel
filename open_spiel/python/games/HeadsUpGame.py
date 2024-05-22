@@ -199,7 +199,10 @@ class HeadsUpGameState(pyspiel.State):
         """
     
     def information_state_tensor(self, player=None):
-        _tmp = self.game.observation["vector"]
+        # _tmp = self.game.observation["vector"]
+        self.game.get_observation()
+        _tmp = self.game.observation_vector
+
         return torch.tensor(_tmp, dtype=torch.float32)
         
     def __str__(self):
@@ -224,14 +227,6 @@ class HeadsUpGameObserver:
         if params:
             raise ValueError(f"Observation parameters not supported; passed {params}")
         """
-        pieces = [("player", 2, (2,))]
-        if iig_obs_type.private_info == pyspiel.PrivateInfoType.SINGLE_PLAYER:
-            pieces.append(("private_cards",34 , (2,17)))
-        pieces.append(("public_cards", 85, (5, 17))) 
-        total_size = sum(size for name, size, shape in pieces)
-        self.tensor = np.zeros(total_size, np.float32)
-
-        """
         pieces = [("opp_action_vec", 16, (16,))]
         pieces.append(("pot", 1, (1,)))
         pieces.append(("my_pos", 1, (1,)))
@@ -244,6 +239,17 @@ class HeadsUpGameObserver:
         pieces.append(("my_hand", 5, (5, )))
         pieces.append(("public_cards", 17, (17, )))
         pieces.append(("relation_vec", 8, (8,)))
+        """
+        pieces = [("my_hand_vec", 17, (17,))]
+        pieces.append(("public_cards", 17 * 5, (17 *5, )))
+        pieces.append(("pot", 1, (1,)))
+        pieces.append(("my_pos", 1, (1,)))
+        pieces.append(("my_bankroll", 1, (1,)))
+        pieces.append(("opp_bankroll", 1, (1,)))
+        pieces.append(("my_bet", 1, (1,)))
+        pieces.append(("opp_bet", 1, (1,)))
+        pieces.append(("my_action_history", 12*10, (12*10,)))
+        pieces.append(("opp_action_history", 12*10, (12*10,)))
 
         total_size = sum(size for name, size, shape in pieces)
         self.tensor = np.zeros(total_size, np.float32)
@@ -256,6 +262,19 @@ class HeadsUpGameObserver:
     def set_from(self, state, player):
         self.tensor.fill(0)
         # state.game.get_observation()
+        _tmp = state.game.observation_vector
+        self.dict["my_hand_vec"][:] = _tmp[0:17]
+        self.dict["public_cards"][:] = _tmp[17:119]
+        self.dict["pot"][:] = _tmp[119]
+        self.dict["my_pos"][:] = _tmp[120]
+        self.dict["my_bankroll"][:] = _tmp[121]
+        self.dict["opp_bankroll"][:] = _tmp[122]
+        self.dict["my_bet"][:] = _tmp[123]
+        self.dict["opp_bet"][:] = _tmp[124]
+        self.dict["my_action_history"][:] = _tmp[125:245]
+        self.dict["opp_action_history"][:] = _tmp[245:365]
+
+        """
         print("set_from")
         _tmp = state.game.observation["vector"]
         self.dict["opp_action_vec"][:] = _tmp[0:16]
@@ -270,15 +289,8 @@ class HeadsUpGameObserver:
         self.dict["my_hand"][:] = _tmp[27:32]
         self.dict["public_cards"][:] = _tmp[32:49]
         self.dict["relation_vec"][:] = _tmp[49:57]
+        """
 
-        """
-        if "player" in self.dict:
-            self.dict["player"][player] = 1
-        if "private_cards" in self.dict:
-            self.dict["private_cards"][:] = state.game.get_observation_dict("private_cards")
-        if "public_cards" in self.dict:
-            self.dict["public_cards"][:] = state.game.get_observation_dict("public_cards")
-        """
 
     def string_from(self, state, player):
         return "string from is not implemented."
