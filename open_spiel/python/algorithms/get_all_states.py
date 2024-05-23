@@ -35,7 +35,7 @@ def _get_subgames_states(state, all_states, depth_limit, depth,
   if pbar is not None:
     pbar.update(1)
     pbar.set_description(f"States: {len(all_states)} Depth distribution: {depth_distribution}")
-    print(state)
+    # print(state)
 
   if state.is_terminal():
     if include_terminals:

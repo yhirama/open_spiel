@@ -40,7 +40,7 @@ from open_spiel.python.algorithms import get_all_states
 import pyspiel
 from tqdm import tqdm
 
-DEPTH_LIMIT = 5
+DEPTH_LIMIT = 10
 
 def child(state, action):
   """Returns a child state, handling the simultaneous node case."""
@@ -490,10 +490,10 @@ def tabular_policy_from_callable(game, callable_policy, players=None):
   Returns:
     A TabularPolicy that materializes the callable policy.
   """
-  print("Creating TabularPolicy")
+  # print("Creating TabularPolicy")
   tabular_policy = TabularPolicy(game, players)
   # for state_index, state in enumerate(tqdm(tabular_policy.states):
-  print("Calculating average policy")
+  # print("Calculating average policy")
   for state_index, state in enumerate(tqdm(tabular_policy.states, desc="Calculating average policy")):
     action_probabilities = dict(callable_policy(state))
     infostate_policy = [

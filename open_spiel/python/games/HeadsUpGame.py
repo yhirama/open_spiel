@@ -227,29 +227,19 @@ class HeadsUpGameObserver:
         if params:
             raise ValueError(f"Observation parameters not supported; passed {params}")
         """
-        pieces = [("opp_action_vec", 16, (16,))]
-        pieces.append(("pot", 1, (1,)))
-        pieces.append(("my_pos", 1, (1,)))
-        pieces.append(("my_bankroll", 1, (1,)))
-        pieces.append(("opp_bankroll", 1, (1,)))
-        pieces.append(("my_bet", 1, (1,)))
-        pieces.append(("opp_bet", 1, (1,)))
-        pieces.append(("opp_raise_size", 1, (1,)))
-        pieces.append(("state", 4, (4,)))
-        pieces.append(("my_hand", 5, (5, )))
-        pieces.append(("public_cards", 17, (17, )))
-        pieces.append(("relation_vec", 8, (8,)))
-        """
         pieces = [("my_hand_vec", 17, (17,))]
         pieces.append(("public_cards", 17 * 5, (17 *5, )))
+        """
+        pieces = [("my_hand_vec", 2, (2,))]
+        pieces.append(("public_cards", 5, (5, )))
         pieces.append(("pot", 1, (1,)))
         pieces.append(("my_pos", 1, (1,)))
         pieces.append(("my_bankroll", 1, (1,)))
         pieces.append(("opp_bankroll", 1, (1,)))
         pieces.append(("my_bet", 1, (1,)))
         pieces.append(("opp_bet", 1, (1,)))
-        pieces.append(("my_action_history", 12*10, (12*10,)))
-        pieces.append(("opp_action_history", 12*10, (12*10,)))
+        pieces.append(("my_action_history", 10, (10,)))
+        pieces.append(("opp_action_history", 10, (10,)))
 
         total_size = sum(size for name, size, shape in pieces)
         self.tensor = np.zeros(total_size, np.float32)
@@ -263,6 +253,18 @@ class HeadsUpGameObserver:
         self.tensor.fill(0)
         # state.game.get_observation()
         _tmp = state.game.observation_vector
+        self.dict["my_hand_vec"][:] = _tmp[0:2]
+        self.dict["public_cards"][:] = _tmp[2:7]
+        self.dict["pot"][:] = _tmp[7]
+        self.dict["my_pos"][:] = _tmp[8]
+        self.dict["my_bankroll"][:] = _tmp[9]
+        self.dict["opp_bankroll"][:] = _tmp[10]
+        self.dict["my_bet"][:] = _tmp[11]
+        self.dict["opp_bet"][:] = _tmp[12]
+        self.dict["my_action_history"][:] = _tmp[13:23]
+        self.dict["opp_action_history"][:] = _tmp[23:33]
+
+        """
         self.dict["my_hand_vec"][:] = _tmp[0:17]
         self.dict["public_cards"][:] = _tmp[17:119]
         self.dict["pot"][:] = _tmp[119]
@@ -274,7 +276,6 @@ class HeadsUpGameObserver:
         self.dict["my_action_history"][:] = _tmp[125:245]
         self.dict["opp_action_history"][:] = _tmp[245:365]
 
-        """
         print("set_from")
         _tmp = state.game.observation["vector"]
         self.dict["opp_action_vec"][:] = _tmp[0:16]

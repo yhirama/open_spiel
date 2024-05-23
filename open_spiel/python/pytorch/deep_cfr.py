@@ -192,6 +192,122 @@ class ReservoirBuffer(object):
   def __iter__(self):
     return iter(self._data)
 
+class CardEmbedding(nn.Module):
+    def __init__(self, dim=64):
+        super(CardEmbedding, self).__init__()
+        self.rank = nn.Embedding(13, dim)
+        self.suit = nn.Embedding(4, dim)
+        self.card = nn.Embedding(52, dim)
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    def forward(self, input):
+        B, num_cards = input.shape
+        x = input.reshape(-1).long().to(self.device)
+        valid = x.ge(0).float()  # -1 means 'no card'
+        x = x.clamp(min=0)
+        embs = self.card(x) + self.rank(x // 4) + self.suit(x % 4)
+        embs = embs * valid.unsqueeze(1)  # zero out 'no card' embeddings
+        return embs.reshape(B, num_cards, -1).sum(1)
+
+class ActionEmbedding(nn.Module):
+    def __init__(self, dim=64):
+        super(ActionEmbedding, self).__init__()
+        self.action = nn.Embedding(12, dim)
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    def forward(self, input):
+        B, num_actions = input.shape
+        x = input.reshape(-1).long().to(self.device)
+        valid = x.ge(0).float()  # -1 means 'no card'
+        x = x.clamp(min=0)
+        embs = self.action(x)
+        embs = embs * valid.unsqueeze(1)  # zero out 'no card' embeddings
+        return embs.reshape(B, num_actions, -1).sum(1)
+
+class CustomMLP(nn.Module):
+    def __init__(self, input_size, hidden_layers, output_size):
+        super(CustomMLP, self).__init__()
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        current_size = 64 * 2 + 5
+        self.hidden_layers = hidden_layers  # 保存しておく
+        self.input_size = input_size  # 保存しておく
+        self.output_size = output_size  # 保存しておく
+        self.layers = nn.ModuleList()
+        self.card_embedding = nn.ModuleList([CardEmbedding(64) for _ in range(4)]).to(self.device)
+        self.card1 = nn.Linear(64 * 4, 64).to(self.device)
+        self.card2 = nn.Linear(64, 64).to(self.device)
+        self.card3 = nn.Linear(64, 64).to(self.device)
+        self.action_embedding = nn.ModuleList([ActionEmbedding(64) for _ in range(2)]).to(self.device)
+        self.action1 = nn.Linear(64 * 2, 64).to(self.device)
+        self.action2 = nn.Linear(64, 64).to(self.device)
+        self.action3 = nn.Linear(64, 64).to(self.device)
+
+        # 隠れ層を追加
+        for i, hidden_size in enumerate(hidden_layers):
+          self.layers.append(nn.Linear(current_size, hidden_size).to(self.device))
+          self.layers.append(nn.ReLU())
+          if i == len(hidden_layers) - 1:
+            self.layers.append(nn.LayerNorm(hidden_size).to(self.device))  # BatchNormをLayerNormに置き換え
+          current_size = hidden_size
+
+        # 出力層を追加
+        self.output_layer = nn.Linear(current_size, output_size).to(self.device)
+
+    def forward(self, x):
+      x = x.to(self.device) 
+      card_embs = []
+      cards_group = [x[:, :2], x[:, 2:5], x[:, 5:6], x[:, 6:7]]
+      for embedding, card_group in zip(self.card_embedding, cards_group):
+          card_embs.append(embedding(card_group))
+      card_embs = torch.cat(card_embs, dim=1)
+      c = F.relu(self.card1(card_embs))
+      c = F.relu(self.card2(c))
+      c = F.relu(self.card3(c))
+      action_embs = []
+      action_group = [x[:, 12:23], x[:, 23:]]
+      for embedding, action in zip(self.action_embedding, action_group):
+          action_embs.append(embedding(action))
+      action_embs = torch.cat(action_embs, dim=1)
+      a = F.relu(self.action1(action_embs))
+      a = F.relu(self.action2(a))
+      a = F.relu(self.action3(a))
+      g = x[:, 7:12]
+
+      z = torch.cat([c, a, g], dim=1)
+
+      for i in range(0, len(self.layers)-1, 2):
+          linear = self.layers[i]
+          relu = self.layers[i + 1]
+          
+          out = linear(z)
+          if out.shape == z.shape:
+              out = out + z  # スキップ接続を適用
+          out = relu(out)
+          
+          z = out
+
+      z = self.layers[-1](z)  # LayerNormを適用
+
+      # 最終出力層を適用
+      output = self.output_layer(z)
+      output = output.to('cpu')
+      return output
+      
+    def reset(self):
+      def init_weights(m):
+          if isinstance(m, nn.Linear):
+              nn.init.kaiming_uniform_(m.weight, nonlinearity='relu')
+              if m.bias is not None:
+                  nn.init.constant_(m.bias, 0)
+          elif isinstance(m, nn.LayerNorm):
+              nn.init.constant_(m.weight, 1)
+              nn.init.constant_(m.bias, 0)
+      
+      # 新しいモデルを作成し、元のモデルのパラメータを置き換える
+      new_model = CustomMLP(self.input_size, self.hidden_layers, self.output_size)
+      new_model.apply(init_weights)
+      self.layers = new_model.layers
+      self.output_layer = new_model.output_layer
 
 class DeepCFRSolver(policy.Policy):
   """Implements a solver for the Deep CFR Algorithm with PyTorch.
@@ -259,12 +375,14 @@ class DeepCFRSolver(policy.Policy):
     self._reinitialize_advantage_networks = reinitialize_advantage_networks
     self._num_actions = game.num_distinct_actions()
     self._iteration = 1
+    self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Define strategy network, loss & memory.
     self._strategy_memories = ReservoirBuffer(memory_capacity)
-    self._policy_network = MLP(self._embedding_size,
+    self._policy_network = CustomMLP(self._embedding_size,
                                list(policy_network_layers),
                                self._num_actions)
+    self._policy_network.to(self.device)
     # Illegal actions are handled in the traversal code where expected payoff
     # and sampled regret is computed from the advantage networks.
     self._policy_sm = nn.Softmax(dim=-1)
@@ -277,8 +395,8 @@ class DeepCFRSolver(policy.Policy):
         ReservoirBuffer(memory_capacity) for _ in range(self._num_players)
     ]
     self._advantage_networks = [
-        MLP(self._embedding_size, list(advantage_network_layers),
-            self._num_actions) for _ in range(self._num_players)
+        CustomMLP(self._embedding_size, list(advantage_network_layers),
+            self._num_actions).to(self.device) for _ in range(self._num_players)
     ]
     self._loss_advantages = nn.MSELoss(reduction="mean")
     self._optimizer_advantages = []
@@ -482,6 +600,9 @@ class DeepCFRSolver(policy.Policy):
       # Ensure some samples have been gathered.
       if not info_states:
         return None
+      if len(info_states) < self._batch_size_advantage:
+        return None
+
       self._optimizer_advantages[player].zero_grad()
       advantages = torch.FloatTensor(np.array(advantages))
       iters = torch.FloatTensor(np.sqrt(np.array(iterations)))
