@@ -224,11 +224,26 @@ class ActionEmbedding(nn.Module):
         embs = embs * valid.unsqueeze(1)  # zero out 'no card' embeddings
         return embs.reshape(B, num_actions, -1).sum(1)
 
+class GameEmbedding(nn.Module):
+  def __init__(self, dim=64):
+    super(GameEmbedding, self).__init__()
+    self.game = nn.Embedding(5, dim)
+    self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+  
+  def forward(self, input):
+    B, num_games = input.shape
+    x = input.reshape(-1).long().to(self.device)
+    valid = x.ge(0).float()  # -1 means 'no card'
+    x = x.clamp(min=0)
+    embs = self.game(x)
+    embs = embs * valid.unsqueeze(1)  # zero out 'no card' embeddings
+    return embs.reshape(B, num_games, -1).sum(1)
+
 class CustomMLP(nn.Module):
     def __init__(self, input_size, hidden_layers, output_size):
         super(CustomMLP, self).__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        current_size = 64 * 2 + 5
+        current_size = 64 * 3
         self.hidden_layers = hidden_layers  # 保存しておく
         self.input_size = input_size  # 保存しておく
         self.output_size = output_size  # 保存しておく
@@ -241,6 +256,10 @@ class CustomMLP(nn.Module):
         self.action1 = nn.Linear(64 * 2, 64).to(self.device)
         self.action2 = nn.Linear(64, 64).to(self.device)
         self.action3 = nn.Linear(64, 64).to(self.device)
+        self.game_embedding = GameEmbedding(64).to(self.device)
+        self.game1 = nn.Linear(64, 64).to(self.device)
+        self.game2 = nn.Linear(64, 64).to(self.device)
+        self.game3 = nn.Linear(64, 64).to(self.device)
 
         # 隠れ層を追加
         for i, hidden_size in enumerate(hidden_layers):
@@ -255,6 +274,7 @@ class CustomMLP(nn.Module):
 
     def forward(self, x):
       x = x.to(self.device) 
+      # カードの埋め込みを計算
       card_embs = []
       cards_group = [x[:, :2], x[:, 2:5], x[:, 5:6], x[:, 6:7]]
       for embedding, card_group in zip(self.card_embedding, cards_group):
@@ -263,6 +283,8 @@ class CustomMLP(nn.Module):
       c = F.relu(self.card1(card_embs))
       c = F.relu(self.card2(c))
       c = F.relu(self.card3(c))
+
+      # アクションの埋め込みを計算
       action_embs = []
       action_group = [x[:, 12:23], x[:, 23:]]
       for embedding, action in zip(self.action_embedding, action_group):
@@ -271,7 +293,13 @@ class CustomMLP(nn.Module):
       a = F.relu(self.action1(action_embs))
       a = F.relu(self.action2(a))
       a = F.relu(self.action3(a))
+
+      # ゲームの埋め込みを計算
       g = x[:, 7:12]
+      game_embs = self.game_embedding(g)
+      g = F.relu(self.game1(game_embs))
+      g = F.relu(self.game2(g))
+      g = F.relu(self.game3(g))
 
       z = torch.cat([c, a, g], dim=1)
 
@@ -593,7 +621,9 @@ class DeepCFRSolver(policy.Policy):
       info_states = []
       advantages = []
       iterations = []
+      print("--------------------")
       for s in samples:
+        print(s)
         info_states.append(s.info_state)
         advantages.append(s.advantage)
         iterations.append([s.iteration])
@@ -602,6 +632,7 @@ class DeepCFRSolver(policy.Policy):
         return None
       if len(info_states) < self._batch_size_advantage:
         return None
+      print(len(info_states))
 
       self._optimizer_advantages[player].zero_grad()
       advantages = torch.FloatTensor(np.array(advantages))
